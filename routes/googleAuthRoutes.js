@@ -24,7 +24,7 @@ router.get(
     );
 
     // 🔁 REDIRECT WITH TOKEN
-   res.redirect(`http://localhost:5173/login?token=${token}`);
+   res.redirect(`${process.env.FRONTEND_URL}/login?token=${token}`);
   }
 );
 
