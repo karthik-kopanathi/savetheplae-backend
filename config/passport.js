@@ -1,8 +1,6 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 const Donor = require("../models/Donor");
 const Notification = require("../models/Notification");
 
@@ -24,7 +22,6 @@ passport.use(
           user.name = profile.displayName;
           await user.save();
 
-          // ✅ If city is still missing, create/ensure the notification exists
           if (!user.city) {
             const alreadyNotified = await Notification.findOne({
               userId: user._id,
@@ -44,7 +41,7 @@ passport.use(
           return done(null, user);
         }
 
-        // ✅ New user — download profile pic
+        // ✅ New user — download profile pic as Base64 (no disk needed)
         let profilePic = "/default-avatar.png";
         const googlePhoto = profile.photos?.[0]?.value;
 
@@ -56,12 +53,8 @@ passport.use(
               responseType: "arraybuffer",
             });
 
-            const uploadDir = path.join(__dirname, "../uploads");
-            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-            const imagePath = path.join(uploadDir, `${profile.id}.jpg`);
-            fs.writeFileSync(imagePath, response.data);
-            profilePic = `uploads/${profile.id}.jpg`;
+            const base64 = Buffer.from(response.data).toString("base64");
+            profilePic = `data:image/jpeg;base64,${base64}`;
           } catch (error) {
             console.log("Image download failed:", error.message);
           }
@@ -74,10 +67,9 @@ passport.use(
           googleId: profile.id,
           profilePic,
           role: "donor",
-          // city intentionally left empty — they must fill it in settings
         });
 
-        // ✅ Create "complete your profile" notification for new Google user
+        // ✅ Create "complete your profile" notification
         await Notification.create({
           userId: user._id,
           message: "👋 Please complete your profile — add your Details in Settings so we can match you with nearby donations.",
